@@ -85,9 +85,13 @@ the client detects which it is talking to rather than assuming.
 
 | Variant | Port | Frame | Identified by |
 |---|---|---|---|
-| **Legacy** | UDP 7099 | 9 bytes, as above | Replies with telemetry |
+| **Legacy** | UDP 7099 | 9 bytes, as above | Replies with a status packet |
 | **GL** | UDP 7099 | 21 bytes, `03 66 14 …` | Device id in telemetry byte 0: 82, 85, 88, 103, or 90–101 |
 | **WIFI_8K** | UDP 8090 | 8 bytes, no `0x03` prefix, checksum excludes flags | Never replies; needs the mode switch below |
+
+The reference aircraft used for this document reports device id **0x54 (84)**,
+which is not in the GL list, so it runs the Legacy dialect on UDP 7099. Its
+replies are described in section 7.
 
 **WIFI_8K boards boot bound to their physical remote** and discard Wi-Fi
 commands until told otherwise. Send `42 76` to UDP **8080** to take control, and
@@ -108,6 +112,13 @@ sideways. Clients should rotate based on the reported dimensions rather than
 hard-coding an angle, so that a correctly mounted camera is not rotated wrongly.
 
 Resolution is the camera's real output, not a client-side limit.
+
+**Recording needs a client-side muxer.** The libmpv build shipped by media_kit
+for Android carries no muxers at all — asking it to record answers
+`recorder: Output format not found` and disables itself, whatever the file
+extension. A client that wants clips has to assemble them itself; pulling a
+JPEG frame from the player on a timer and writing MJPEG/AVI works, and costs
+no re-encoding because the frames are already JPEG.
 
 ## 5. Platform traps
 
@@ -157,11 +168,35 @@ arriving over RTP on a pair of UDP ports.
 **The lesson worth keeping:** when a device's protocol is undocumented, read the
 software that already speaks it before trusting second-hand descriptions.
 
-## 7. Not yet decoded
+## 7. What the aircraft reports back
 
-- **Telemetry payload.** The aircraft replies to heartbeats with short packets;
-  byte 0 is a device id and byte 2 reports remote-control button presses. The
-  battery and altitude fields have not been located, so the app shows no charge
-  level. The parser in the official app's `SocketClient` would settle it.
-- **Gripper commands.** Hyperion-specific and not yet designed. They should
-  extend the flags byte rather than introduce a second channel.
+The Legacy board does answer, contrary to what a naive probe suggests. Over one
+session it sent 422 replies, **every one of them identical**:
+
+```
+54 00 00 00 00        5 bytes
+```
+
+Byte 0 is the device id (0x54). Bytes 1–4 were zero throughout, with the
+battery around half charge — so none of them carries a charge level.
+
+**This board therefore has no telemetry.** The official app's parser reads its
+battery and altitude fields from offsets 5 and 8, and only enters that branch
+when the packet is at least 15 bytes long. A 5-byte reply never reaches it. The
+stock app cannot show a charge level on this hardware either; the data is not
+sent.
+
+Treat the reply as a liveness signal and nothing more. A client should show no
+battery indicator rather than a fabricated one.
+
+**For Hyperion's own firmware this is a gap worth closing.** Sending real
+battery and altitude in a longer packet costs nothing and makes the aircraft
+safer to fly — a pilot who cannot see the charge finds out it was low by
+watching the aircraft drop.
+
+## 8. Not yet designed
+
+- **Gripper commands.** Hyperion-specific. They should extend the flags byte
+  rather than introduce a second channel.
+- **Extended telemetry.** See above: the format is Hyperion's to define, since
+  no donor board provides one worth copying.
