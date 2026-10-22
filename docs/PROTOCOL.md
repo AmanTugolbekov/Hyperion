@@ -89,6 +89,11 @@ the client detects which it is talking to rather than assuming.
 | **GL** | UDP 7099 | 21 bytes, `03 66 14 …` | Device id in telemetry byte 0: 82, 85, 88, 103, or 90–101 |
 | **WIFI_8K** | UDP 8090 | 8 bytes, no `0x03` prefix, checksum excludes flags | Never replies; needs the mode switch below |
 
+The reference aircraft advertises the Wi-Fi network **`WIFI-UFO-8c4225`**.
+Note that the name says "UFO" and nothing about E88 — a client matching network
+names must not read "UFO" as the generic dialect, or it will drive this board
+with the wrong frame format and the aircraft will ignore it entirely.
+
 The reference aircraft used for this document reports device id **0x54 (84)**,
 which is not in the GL list, so it runs the Legacy dialect on UDP 7099. Its
 replies are described in section 7.
